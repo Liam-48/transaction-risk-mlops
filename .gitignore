@@ -1,6 +1,26 @@
+
+# Python environments
 .venv/
+venv/
+
+# Python cache
 __pycache__/
-.env
-data/
-artifacts/
+*.pyc
 .pytest_cache/
+
+# Dataset
+data/
+
+# MLflow database and artifacts
+mlflow.db*
+mlartifacts/
+mlruns/
+
+# Environment variables and secrets
+.env
+.env.*
+
+# IDE and OS
+.vscode/
+.DS_Store
+Thumbs.db
