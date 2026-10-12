@@ -1,0 +1,28 @@
+{
+  "champion_version": "1",
+  "challenger_version": "2",
+  "review_capacity": 0.01,
+  "min_extra_frauds": 5,
+  "decision": {
+    "eligible_for_promotion": true,
+    "frauds_gained": 8,
+    "champion": {
+      "average_precision": 0.17726738373792178,
+      "reviewed": 1082,
+      "frauds_captured": 295,
+      "precision_at_capacity": 0.27264325323475047,
+      "recall_at_capacity": 0.20344827586206896
+    },
+    "challenger": {
+      "average_precision": 0.1803183760684743,
+      "reviewed": 1082,
+      "frauds_captured": 303,
+      "precision_at_capacity": 0.2800369685767098,
+      "recall_at_capacity": 0.20896551724137932
+    },
+    "checks": {
+      "capture_improved": true,
+      "ap_not_worse": true
+    }
+  }
+}

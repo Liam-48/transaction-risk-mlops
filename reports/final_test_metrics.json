@@ -1,0 +1,11 @@
+{
+  "model_version": "2",
+  "test_month": 7,
+  "test_samples": 96843,
+  "fraud_prevalence": 0.014745515938167962,
+  "average_precision": 0.21952197848708868,
+  "reviewed": 969,
+  "frauds_captured": 316,
+  "precision_at_capacity": 0.32610939112487103,
+  "recall_at_capacity": 0.22128851540616246
+}

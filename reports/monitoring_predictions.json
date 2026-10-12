@@ -1,0 +1,12 @@
+{
+  "model": "models:/bank-fraud-risk@champion",
+  "reference_count": 794989,
+  "current_count": 108168,
+  "reference_mean_score": 0.010249733924865723,
+  "current_mean_score": 0.012451709248125553,
+  "reference_p95_score": 0.03980216011404991,
+  "current_p95_score": 0.04953552782535553,
+  "prediction_ks": 0.04754138329684032,
+  "model_version": "1",
+  "resolved_model_uri": "models:/bank-fraud-risk/1"
+}
