@@ -81,3 +81,28 @@ def test_batched_predictions():
         scores,
         [0.1, 0.2, 0.3, 0.4, 0.5]
     )
+
+def test_monitoring_policy_flags_large_drift():
+    import pandas as pd
+    from src.monitor import assess_drift
+
+    report = pd.DataFrame([
+        {
+            "feature": "velocity_4w",
+            "metric": "KS",
+            "drift": 0.69,
+            "missing_delta_pp": 0.0,
+        },
+        {
+            "feature": "income",
+            "metric": "KS",
+            "drift": 0.05,
+            "missing_delta_pp": 0.0,
+        },
+    ])
+
+    decision = assess_drift(report)
+
+    assert decision["status"] == "review_recommended"
+    assert len(decision["findings"]) == 1
+    assert decision["findings"][0]["feature"] == "velocity_4w"

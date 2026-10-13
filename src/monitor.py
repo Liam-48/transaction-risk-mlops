@@ -130,6 +130,51 @@ def monitor_features(reference, current):
     return pd.DataFrame(results)
 
 
+def assess_drift(report):
+    thresholds = {
+        "KS": 0.20,
+        "TVD": 0.10,
+        "missing_delta_pp": 5.0,
+    }
+
+    findings = []
+
+    for row in report.itertuples(index=False):
+        # Numerical or categorical distribution shift
+        threshold = thresholds[row.metric]
+
+        if row.drift > threshold:
+            findings.append({
+                "feature": row.feature,
+                "check": row.metric,
+                "observed": round(float(row.drift), 4),
+                "threshold": threshold,
+            })
+
+        # Missing-value shift, in percentage points
+        missing_change = abs(row.missing_delta_pp)
+
+        if missing_change > thresholds["missing_delta_pp"]:
+            findings.append({
+                "feature": row.feature,
+                "check": "missing_delta_pp",
+                "observed": round(float(missing_change), 4),
+                "threshold": thresholds["missing_delta_pp"],
+            })
+
+    status = (
+        "review_recommended"
+        if findings
+        else "within_limits"
+    )
+
+    return {
+        "status": status,
+        "policy_thresholds": thresholds,
+        "findings": findings,
+    }
+
+
 def predict_in_batches(model, X, batch_size=25_000):
     scores = []
 
@@ -200,10 +245,16 @@ def monitor_predictions(reference, current):
     }
 
 
+
 def save_drift_chart(report):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.colors import LinearSegmentedColormap
+
+    TEXT = "#243B53"
+    GRID = "#D9E2EC"
 
     top = (
         report[report["metric"] == "KS"]
@@ -211,52 +262,103 @@ def save_drift_chart(report):
         .sort_values("drift")
     )
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    labels = [
+        feature.replace("_", " ")
+        for feature in top["feature"]
+    ]
 
-    ax.barh(top["feature"], top["drift"])
+    values = top["drift"].to_numpy()
+    positions = np.arange(len(top))
 
-    ax.set_title(
-        "Numerical Feature Drift\n"
-        "Historical reference vs. monitoring batch",
-        fontsize=15,
-        fontweight="bold",
-        pad=16
+    cmap = LinearSegmentedColormap.from_list(
+        "custom_drift",
+        ["#2A9D8F", "#1D3557"]
     )
 
-    ax.set_xlabel("Kolmogorov–Smirnov distance")
+    vmin, vmax = values.min(), values.max()
+    normalized = (values - vmin) / (vmax - vmin + 1e-12)
+    colors = [cmap(v) for v in normalized]
 
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
+    fig, ax = plt.subplots(figsize=(11, 6.2), dpi=180)
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
 
-    ax.grid(axis="x", alpha=0.2)
-    ax.set_axisbelow(True)
+    bars = ax.barh(
+        positions,
+        values,
+        height=0.60,
+        color=colors,
+        zorder=3
+    )
 
-    xmax = max(top["drift"].max(), 0.05)
-
-    ax.set_xlim(0, xmax * 1.2)
-
-    for i, value in enumerate(top["drift"]):
+    for bar, value in zip(bars, values):
         ax.text(
-            value + xmax * 0.015,
-            i,
+            value + 0.010,
+            bar.get_y() + bar.get_height() / 2,
             f"{value:.3f}",
             va="center",
-            fontsize=9
+            ha="left",
+            fontsize=10.5,
+            color=TEXT,
         )
 
-    fig.tight_layout()
+    ax.set_yticks(positions)
+    ax.set_yticklabels(labels, fontsize=11, color=TEXT)
+
+    ax.set_xlim(0, values.max() * 1.16)
+
+    ax.set_xlabel(
+        "Kolmogorov–Smirnov distance",
+        fontsize=12,
+        color=TEXT,
+        labelpad=12
+    )
+
+    fig.suptitle(
+        "Numerical Feature Drift",
+        fontsize=20,
+        color=TEXT,
+        fontweight="semibold",
+        y=0.97
+    )
+
+    ax.set_axisbelow(True)
+    ax.grid(
+        axis="x",
+        color=GRID,
+        linewidth=0.8,
+        alpha=0.9
+    )
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    ax.tick_params(
+        axis="both",
+        length=0,
+        colors=TEXT,
+        pad=8,
+        labelsize=11
+    )
+
+    fig.subplots_adjust(
+        left=0.33,
+        right=0.95,
+        top=0.88,
+        bottom=0.14
+    )
 
     fig.savefig(
         REPORT_DIR / "feature_drift.png",
-        dpi=180,
-        bbox_inches="tight"
+        dpi=200,
+        bbox_inches="tight",
+        facecolor="white"
     )
 
     plt.close(fig)
 
-
 def log_monitoring_run(feature_report, prediction_report,
-                       reference_count, current_count):
+                       reference_count, current_count, monitoring_decision,):
     import mlflow
 
     mlflow.set_tracking_uri(
@@ -294,6 +396,10 @@ def log_monitoring_run(feature_report, prediction_report,
             "current_mean_score": prediction_report["current_mean_score"],
             "reference_p95_score": prediction_report["reference_p95_score"],
             "current_p95_score": prediction_report["current_p95_score"],
+            "policy_findings": len(monitoring_decision["findings"]),
+            "review_recommended": int(
+                monitoring_decision["status"] == "review_recommended"
+            ),
         })
 
         # Attach reports for reproducibility
@@ -301,6 +407,7 @@ def log_monitoring_run(feature_report, prediction_report,
             "monitoring_features.csv",
             "monitoring_predictions.json",
             "feature_drift.png",
+            "monitoring_status.json"
         ]
 
         for filename in files:
@@ -341,6 +448,36 @@ def main():
         index=False
     )
 
+
+    # Evaluate monitoring policy
+    monitoring_decision = assess_drift(report)
+
+    status_path = REPORT_DIR / "monitoring_status.json"
+
+    status_path.write_text(
+        json.dumps(monitoring_decision, indent=2),
+        encoding="utf-8"
+    )
+
+    print(
+        f"\nMonitoring status: "
+        f"{monitoring_decision['status']}"
+    )
+
+    print(
+        f"Policy findings: "
+        f"{len(monitoring_decision['findings'])}"
+    )
+
+    for finding in monitoring_decision["findings"]:
+        print(
+            f"  {finding['feature']}: "
+            f"{finding['check']} = "
+            f"{finding['observed']:.4f} "
+            f"(threshold: {finding['threshold']})"
+        )
+
+
     save_drift_chart(report)
 
     print("\nTop numerical drift:")
@@ -374,7 +511,8 @@ def main():
             report,
             prediction_report,
             len(reference),
-            len(current)
+            len(current),
+            monitoring_decision
         )
 
         print("\nPrediction drift:")

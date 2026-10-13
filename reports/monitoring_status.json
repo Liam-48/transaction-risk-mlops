@@ -1,0 +1,40 @@
+{
+  "status": "review_recommended",
+  "policy_thresholds": {
+    "KS": 0.2,
+    "TVD": 0.1,
+    "missing_delta_pp": 5.0
+  },
+  "findings": [
+    {
+      "feature": "zip_count_4w",
+      "check": "KS",
+      "observed": 0.2026,
+      "threshold": 0.2
+    },
+    {
+      "feature": "velocity_6h",
+      "check": "KS",
+      "observed": 0.3704,
+      "threshold": 0.2
+    },
+    {
+      "feature": "velocity_24h",
+      "check": "KS",
+      "observed": 0.4705,
+      "threshold": 0.2
+    },
+    {
+      "feature": "velocity_4w",
+      "check": "KS",
+      "observed": 0.6916,
+      "threshold": 0.2
+    },
+    {
+      "feature": "date_of_birth_distinct_emails_4w",
+      "check": "KS",
+      "observed": 0.2213,
+      "threshold": 0.2
+    }
+  ]
+}
